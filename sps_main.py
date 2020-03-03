@@ -3,7 +3,12 @@ import mysql.connector
 import time
 import datetime
 import json
+import logging
 
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)s %(message)s',
+                    filename='sps_main.log',
+                    filemode='w')
 
 mqtt_server = "localhost"
 mqtt_port = 1883
@@ -17,13 +22,13 @@ user = "spsadmin"
 passwd = "sps"
 database = "parksys"
 
+site201num = 3
+
 #############################
 
-actualAvail = []
-ongoingAvial = []
-for i in range(3):
-    actualAvail.append(0)
-    ongoingAvial.append(0)
+site201avail = []
+for i in range(site201num):
+    site201avail.append(0)
 
 
 def log_event(event, event_detail):
@@ -35,28 +40,35 @@ def log_event(event, event_detail):
 
 
 def on_connect(client, userdata, flags, rc):
-    print("Connected mqtt with result code "+str(rc))
+    logging.debug("Connected mqtt with result code "+str(rc))
     client.subscribe(sub_topic)
 
 
 def on_message(client, userdata, msg):
-    print(msg.topic+" "+str(msg.payload, encoding='utf-8'))
-    if msg.topic == 'sps/CB201':
-        payloadInfo = str(msg.payload, encoding='utf-8').split(';')
-        if payloadInfo[0] == '221':
-            ##########init if needed
-            payloaddict = json.loads(payloadInfo[1])
-            if len(actualAvail)==0:
-                for i in range(len(payloaddict)):
-                    actualAvail.append(0)
-                    ongoingAvial.append(0)
-            ###################
-            for i in range(len(payloaddict)):
-                actualAvail[i] = payloaddict[str(1000+i)]
+    # logging.debug(msg.topic+" "+str(msg.payload, encoding='utf-8'))
+    handler(msg.topic, str(msg.payload, encoding='utf-8'))
+    # if msg.topic == 'sps/CB201':
+    #     payloadInfo = str(msg.payload, encoding='utf-8').split(';')
+    #     if payloadInfo[0] == '221':
+    #         payloaddict = json.loads(payloadInfo[1])
+    #         for i in range(len(payloaddict)):
+    #             site201avail[i] = payloaddict[str(1000+i)]
 
-def availMonitor():
-    print(actualAvail)
-        
+
+def handler(topic, msg):
+    if topic == 'sps/CB201':
+        payload = msg.split(';')
+        if payload[0] == '221':
+            payloaddict = json.loads(payload[1])
+            for i in range(len(payloaddict)):
+                    site201avail[i] = payloaddict[str(1000+i)]
+            logging.info(site201avail)
+
+
+
+# def availMonitor():
+#     print(site201avail)
+
 
 
 dbsetup = 1
@@ -71,19 +83,20 @@ try:
             try:
                 mdb = mysql.connector.connect(
                     host="localhost", user="spsadmin", passwd="sps", database="parksys")
+                logging.info("mdb connected")
                 dbsetup = 0
-                print(mdb)
             except:
-                print("Warning: No database (connection) found. Retry in one minute.")
+                logging.debug("Warning: No database (connection) found. Retry in one minute.")
                 time.sleep(60)
                 pass
 
         while mqttsetup == 1:
             try:
                 client.connect(mqtt_server, mqtt_port, mqtt_alive)
+                logging.info("mqtt connected")
                 mqttsetup = 0
             except:
-                print("Warning: No broker found. Retry in one minute.")
+                logging.debug("Warning: No broker found. Retry in one minute.")
                 log_event(401, "No broker found")
                 time.sleep(60)
                 pass
@@ -96,7 +109,7 @@ try:
         # mainevent
         while mqttsetup == 0:
             mqttsetup = client.loop()
-            availMonitor()
+            # availMonitor()
         #############
 
 except KeyboardInterrupt:

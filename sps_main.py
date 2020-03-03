@@ -45,7 +45,7 @@ def on_connect(client, userdata, flags, rc):
 
 
 def on_message(client, userdata, msg):
-    # logging.debug(msg.topic+" "+str(msg.payload, encoding='utf-8'))
+    logging.debug(msg.topic+" "+str(msg.payload, encoding='utf-8'))
     handler(msg.topic, str(msg.payload, encoding='utf-8'))
     # if msg.topic == 'sps/CB201':
     #     payloadInfo = str(msg.payload, encoding='utf-8').split(';')
